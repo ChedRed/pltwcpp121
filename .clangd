@@ -1,0 +1,2 @@
+CompileFlags:
+  Add: [-isystem, /usr/local/include, -std=c++2b, -ferror-limit=100]

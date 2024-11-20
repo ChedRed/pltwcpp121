@@ -1,5 +1,8 @@
 #include <SDL3/SDL_timer.h>
 #include <iostream>
+#ifdef _WIN32
+#include <Windows.h>
+#endif
 #include <SDL3/SDL.h>
 #include "sdlas.hpp"
 
@@ -30,7 +33,7 @@ Vector2f target = pos;
 SDL_FRect rectpos = {390, 290, (float)radius, (float)radius};
 
 
-int main(){
+int main(int argc, char* argv[]){
     SDL_Init(SDL_INIT_VIDEO);
     SDL_CreateWindowAndRenderer("PLTW 1.2.1 (C++)", 800, 600, SDL_WINDOW_RESIZABLE, &window, &renderer);
     SDL_Texture * tutel = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, radius * 2, radius * 2);
@@ -85,3 +88,11 @@ int main(){
 
     SDL_Quit();
 }
+
+
+#ifdef _WIN32
+/* Windows window subsystem :( */
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow){
+    return main(__argc, __argv);
+}
+#endif

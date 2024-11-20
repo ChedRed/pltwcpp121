@@ -62,7 +62,7 @@ int main(){
                 case SDL_EVENT_MOUSE_BUTTON_DOWN:
                     if (e.button.button == SDL_BUTTON_LEFT){
                         if ((mouse-pos).magnitude() <= radius) {
-                            target = Vector2f{(float)(SDL_rand((screenspace.x-(radius*2)) + radius)), (float)(SDL_rand((screenspace.y-(radius*2)) + radius))};
+                            target = Vector2f{(float)(SDL_rand(screenspace.x-(radius * 4)) + (radius * 2)), (float)(SDL_rand(screenspace.y-(radius * 4)) + (radius * 2))};
                         }
                     }
                     break;
@@ -79,6 +79,7 @@ int main(){
 
         SDL_RenderTexture(renderer, tutel, NULL, &rectpos);
         SDL_RenderPresent(renderer);
+        SDL_Delay(5);
     }
 
 

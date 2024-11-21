@@ -43,6 +43,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     # Add basic files to macos app
     file(COPY ${CMAKE_SOURCE_DIR}/buildfiles/info.plist DESTINATION ${CMAKE_SOURCE_DIR}/build/PLTWcpp121.app/Contents)
     file(COPY ${CMAKE_SOURCE_DIR}/buildfiles/icon.icns DESTINATION ${CMAKE_SOURCE_DIR}/build/PLTWcpp121.app/Contents/Resources)
+    file(COPY ${CMAKE_SOURCE_DIR}/buildfiles/FreeSans.ttf DESTINATION ${CMAKE_SOURCE_DIR}/build/PLTWcpp121.app/Contents/Resources)
 
 
     # Add resources to macos app
@@ -62,6 +63,7 @@ else(CMAKE_SYSTEM_NAME STREQUAL "Windows")
 
 
     # Add basic files to windows app
+    file(COPY ${CMAKE_SOURCE_DIR}/buildfiles/FreeSans.ttf DESTINATION "${CMAKE_SOURCE_DIR}/build/PLTWcpp121")
 
 
     # Add resources to windows app

@@ -1,7 +1,4 @@
-#include <SDL3/SDL_events.h>
-#include <SDL3/SDL_oldnames.h>
 #include <SDL3/SDL_render.h>
-#include <SDL3/SDL_video.h>
 #include <iostream>
 #include <string>
 #ifdef _WIN32
@@ -48,9 +45,15 @@ SDL_Texture * ScoreNum[10];
 SDL_FRect ScoreNumRect[trusizeof(ScoreNum)];
 
 
-int SDLCALL WindowEventFilter(void * userdata, SDL_Event * e){
-    return 0;
-}
+/* Countdown variables */
+float TimeLeft = 30;
+SDL_FRect FullCountdown = { 800-8, 0, 0, 0 };
+
+
+
+// int SDLCALL WindowEventFilter(void * userdata, SDL_Event * e){
+//     return 0;
+// }
 
 
 int main(int argc, char* argv[]){
@@ -59,7 +62,7 @@ int main(int argc, char* argv[]){
     TTF_Font * font = TTF_OpenFont(((std::string)SDL_GetBasePath()+"../Resources/FreeSans.ttf").c_str(), 32);
     std::cout << SDL_GetError() << std::endl;
     SDL_CreateWindowAndRenderer("PLTW 1.2.1 (C++)", 800, 600, SDL_WINDOW_RESIZABLE, &window, &renderer);
-    SDL_AddEventWatch(WindowEventFilter, NULL);
+    // SDL_AddEventWatch(WindowEventFilter, NULL);
     SDL_SetWindowMinimumSize(window, 800, 600);
     SDL_SetRenderVSync(renderer, 1);
 
@@ -74,6 +77,14 @@ int main(int argc, char* argv[]){
         ScoreNum[i] = SDL_CreateTextureFromSurface(renderer, tempsurf);
         SDL_GetTextureSize(ScoreNum[i], &ScoreNumRect[i].w, &ScoreNumRect[i].h);
     }
+
+
+    /* Setup countdown stuffs */
+    SDL_DestroySurface(tempsurf);
+    tempsurf = TTF_RenderText_Blended(font, " Seconds Remaining", 18, {255, 255, 255, 255});
+    SDL_Texture * CountdownLabel = SDL_CreateTextureFromSurface(renderer, tempsurf);
+    SDL_GetTextureSize(CountdownLabel, &FullCountdown.w, &FullCountdown.h);
+    FullCountdown.x -= FullCountdown.w;
 
 
     /* Setup circle */
@@ -93,10 +104,11 @@ int main(int argc, char* argv[]){
     /* Main loop */
     SDL_SetRenderTarget(renderer, NULL);
     while (loop){
-
-
         deltime = (SDL_GetTicks() - lastime) / 1000.;
         lastime = SDL_GetTicks();
+        TimeLeft -= (Score > 0 && TimeLeft-deltime > 0)?deltime:0;
+
+
         SDL_SetRenderDrawColor(renderer, SDL_Color{0, 0, 0, 255});
         SDL_RenderClear(renderer);
         SDL_GetWindowSizeInPixels(window, &screenspace.x, &screenspace.y);
@@ -107,18 +119,11 @@ int main(int argc, char* argv[]){
             switch (e.type){
                 case SDL_EVENT_MOUSE_BUTTON_DOWN:
                     if (e.button.button == SDL_BUTTON_LEFT){
-                        if ((mouse-pos).magnitude() <= radius) {
+                        if ((mouse-pos).magnitude() <= radius && floor(TimeLeft) > 0) {
                             target = Vector2f{(float)(SDL_rand(screenspace.x-(radius * 4)) + (radius * 2)), (float)(SDL_rand(screenspace.y-(radius * 4) - FullScore.h) + (radius * 2) + FullScore.h)};
                             Score++;
-                            std::cout << Score << std::endl;
                         }
                     }
-                    break;
-
-
-                case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
-                    target = Vector2f{(float)(SDL_rand(screenspace.x-(radius * 4)) + (radius * 2)), (float)(SDL_rand(screenspace.y-(radius * 4) - FullScore.h) + (radius * 2) + FullScore.h)};
-                    std::cout << "CHANGED" << std::endl;
                     break;
 
 
@@ -136,20 +141,34 @@ int main(int argc, char* argv[]){
         /* Render score */
         float AAAAA = FullScore.w + FullScore.x;
         for (int i = 0; i < std::to_string(Score).length(); i++){
-            ScoreNumRect[((std::to_string(Score))[i])-'0'].x = AAAAA;
-            SDL_RenderTexture(renderer, ScoreNum[((std::to_string(Score))[i])-'0'], NULL, &ScoreNumRect[((std::to_string(Score))[i])-'0']);
-            AAAAA += ScoreNumRect[((std::to_string(Score))[i])-'0'].w;
+            int NumberIndex = ((std::to_string(Score))[i])-'0';
+            ScoreNumRect[NumberIndex].x = AAAAA;
+            SDL_RenderTexture(renderer, ScoreNum[NumberIndex], NULL, &ScoreNumRect[NumberIndex]);
+            AAAAA += ScoreNumRect[NumberIndex].w;
         }
 
+
+        /* Render countdown */
+        AAAAA = FullCountdown.x;
+        for (int i = std::to_string((int)floor(TimeLeft)).length()-1; i > -1; i--){
+            int NumberIndex = ((std::to_string((int)floor(TimeLeft)))[i])-'0';
+            ScoreNumRect[NumberIndex].x = AAAAA - ScoreNumRect[NumberIndex].w;
+            SDL_RenderTexture(renderer, ScoreNum[NumberIndex], NULL, &ScoreNumRect[NumberIndex]);
+            AAAAA -= ScoreNumRect[NumberIndex].w;
+        }
+
+
+        SDL_SetTextureAlphaMod(tutel, limit(TimeLeft*255, 0, 255));
         SDL_RenderTexture(renderer, ScoreLabel, NULL, &FullScore);
+        SDL_RenderTexture(renderer, CountdownLabel, NULL, &FullCountdown);
         SDL_RenderTexture(renderer, tutel, NULL, &rectpos);
         SDL_RenderPresent(renderer);
-        std::cout << std::endl;
     }
 
     TTF_CloseFont(font);
     TTF_Quit();
     SDL_Quit();
+    return 0;
 }
 
 

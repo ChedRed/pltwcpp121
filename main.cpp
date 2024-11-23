@@ -1,3 +1,4 @@
+#include <SDL3/SDL_events.h>
 #include <SDL3/SDL_render.h>
 #include <iostream>
 #include <string>
@@ -25,7 +26,7 @@ bool loop = true;
 SDL_Event e;
 SDL_Window * window;
 SDL_Renderer * renderer;
-Vector2 screenspace;
+Vector2 ScreenSpace;
 Uint32 lastime;
 float deltime;
 
@@ -84,7 +85,7 @@ int main(int argc, char* argv[]){
     tempsurf = TTF_RenderText_Blended(font, " Seconds Remaining", 18, {255, 255, 255, 255});
     SDL_Texture * CountdownLabel = SDL_CreateTextureFromSurface(renderer, tempsurf);
     SDL_GetTextureSize(CountdownLabel, &FullCountdown.w, &FullCountdown.h);
-    FullCountdown.x -= FullCountdown.w;
+    FullCountdown.x = ScreenSpace.x - FullCountdown.w - 8;
 
 
     /* Setup circle */
@@ -111,7 +112,6 @@ int main(int argc, char* argv[]){
 
         SDL_SetRenderDrawColor(renderer, SDL_Color{0, 0, 0, 255});
         SDL_RenderClear(renderer);
-        SDL_GetWindowSizeInPixels(window, &screenspace.x, &screenspace.y);
         SDL_GetMouseState(&mouse.x, &mouse.y);
 
 
@@ -120,10 +120,16 @@ int main(int argc, char* argv[]){
                 case SDL_EVENT_MOUSE_BUTTON_DOWN:
                     if (e.button.button == SDL_BUTTON_LEFT){
                         if ((mouse-pos).magnitude() <= radius && floor(TimeLeft) > 0) {
-                            target = Vector2f{(float)(SDL_rand(screenspace.x-(radius * 4)) + (radius * 2)), (float)(SDL_rand(screenspace.y-(radius * 4) - FullScore.h) + (radius * 2) + FullScore.h)};
+                            target = Vector2f{(float)(SDL_rand(ScreenSpace.x-(radius * 4)) + (radius * 2)), (float)(SDL_rand(ScreenSpace.y-(radius * 4) - FullScore.h) + (radius * 2) + FullScore.h)};
                             Score++;
                         }
                     }
+                    break;
+
+
+                case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
+                    SDL_GetWindowSizeInPixels(window, &ScreenSpace.x, &ScreenSpace.y);
+                    FullCountdown.x = ScreenSpace.x - FullCountdown.w - 8;
                     break;
 
 

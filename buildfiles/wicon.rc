@@ -1,1 +1,12 @@
 WICON ICON DISCARDABLE "icon.ico"
+
+1 VERSIONINFO
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904E4"
+        BEGIN
+            VALUE "FileDescription", "PLTW 1.2.2 (C++)"
+        END
+    END
+END

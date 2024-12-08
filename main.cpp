@@ -1,16 +1,30 @@
-#include <SDL3/SDL_events.h>
-#include <SDL3/SDL_render.h>
-#include <iostream>
-#include <string>
 #ifdef _WIN32
 #include <Windows.h>
 #endif
-#include <SDL3/SDL.h>
-#include <SDL3_ttf/SDL_ttf.h>
-#include "sdlas.hpp"
+#include <fstream>
+#include <sstream>
+#define _USE_MATH_DEFINES
+#include "TextHelp.h"
+
+
+#ifdef _WIN32
+std::string rpath = "./";
+#elif __APPLE__
+std::string rpath = "../Resources/";
+#endif
+
+
+#ifdef _WIN32
+#define SDL_MODKEY SDL_SCANCODE_LCTRL
+#elifdef __APPLE__
+#define SDL_MODKEY SDL_SCANCODE_LGUI
+#endif
 
 
 #define trusizeof(x) (sizeof(x)/sizeof(x[0]))
+
+
+struct Vector2i {int x; int y;};
 
 
 /* Convenience functions */
@@ -20,36 +34,34 @@ float limit(float value, float min, float max) { return (value<min)?min:((value>
 
 /* Main variables */
 bool loop = true;
+bool endgame = false;
+bool rendscorbord = false;
 
 
 /* SDL variables */
 SDL_Event e;
 SDL_Window * window;
 SDL_Renderer * renderer;
-Vector2 ScreenSpace;
+Vector2i ScreenSpace = {800, 600};
 Uint32 lastime;
 float deltime;
+Uint32 mousebitmask;
+const bool * keystates = SDL_GetKeyboardState(NULL);
+float fade = 0;
+float scorefade = 0;
 
 
 /* 'Turtle' variables */
-int radius = 20;
-Vector2f mouse = {0, 0};
-Vector2f pos = {400, 300};
-Vector2f target = pos;
-SDL_FRect rectpos = {390, 290, (float)radius, (float)radius};
+float radius = 20;
+Vector2 mouse = {0, 0};
+Vector2 pos = {400, 300};
+Vector2 target = pos;
+SDL_FRect rectpos = {400-(radius/2), 300-(radius/2), radius, radius};
 
 
-/* Score variables */
+/* Initial variables */
 int Score = 0;
-SDL_FRect FullScore = {8, 0, 0, 0};
-SDL_Texture * ScoreNum[10];
-SDL_FRect ScoreNumRect[trusizeof(ScoreNum)];
-
-
-/* Countdown variables */
 float TimeLeft = 30;
-SDL_FRect FullCountdown = { 800-8, 0, 0, 0 };
-
 
 
 // int SDLCALL WindowEventFilter(void * userdata, SDL_Event * e){
@@ -57,35 +69,85 @@ SDL_FRect FullCountdown = { 800-8, 0, 0, 0 };
 // }
 
 
+// Bubble sort bc standard sort can't change names array as well
+void bubbleSort(int arr[], std::string stringray[], int n) {
+    for (int i = 0; i < n-1; i++) {
+        for (int j = 0; j < n-i-1; j++) {
+            if (arr[j] < arr[j+1]) {
+                std::swap(arr[j], arr[j+1]);
+                std::swap(stringray[j], stringray[j+1]);
+            }
+        }
+    }
+}
+
+
 int main(int argc, char* argv[]){
+    // Setup scoreboard (no json parser ;-;)
+    std::ifstream Scores(SDL_GetBasePath()+rpath+"Scores");
+    std::string line;
+    std::string Names[6];
+    std::string ScoreString[6];
+    int TopScores[6];
+    int CurrentRead = 0;
+    int realsize = 0;
+    if (Scores.is_open()){
+        std::getline(Scores, line);
+        bool ReadingName = true;
+        for (int i = 1; i < line.length()-1; i++){
+            if (ReadingName){
+                if (std::string() + line[i]=="|"){
+                    ReadingName = false;
+                }
+                else{
+                    Names[CurrentRead] += line[i];
+                }
+            }
+            else{
+                if (std::string() + line[i]==","){
+                    TopScores[CurrentRead] = std::stoi(ScoreString[CurrentRead]);
+                    ReadingName = true;
+                    CurrentRead++;
+                }
+                else{
+                    ScoreString[CurrentRead] += line[i];
+                }
+            }
+        }
+        TopScores[CurrentRead] = std::stoi(ScoreString[CurrentRead]);
+        for (int i = 0; i < 6; i++){
+            if (Names[i] != "") realsize++;
+        }
+        bubbleSort(TopScores, Names, realsize);
+    }
+    Scores.close();
+
+
+    // Setup SDL3
     SDL_Init(SDL_INIT_VIDEO);
-    TTF_Init();
-    TTF_Font * font = TTF_OpenFont(((std::string)SDL_GetBasePath()+"../Resources/FreeSans.ttf").c_str(), 32);
-    std::cout << SDL_GetError() << std::endl;
-    SDL_CreateWindowAndRenderer("PLTW 1.2.1 (C++)", 800, 600, SDL_WINDOW_RESIZABLE, &window, &renderer);
+    SDL_CreateWindowAndRenderer("PLTW 1.2.2 (C++)", 800, 600, SDL_WINDOW_RESIZABLE, &window, &renderer);
     // SDL_AddEventWatch(WindowEventFilter, NULL);
+    SDL_StartTextInput(window);
     SDL_SetWindowMinimumSize(window, 800, 600);
     SDL_SetRenderVSync(renderer, 1);
 
 
+    TTF_Init();
+    TTF_Font * font = TTF_OpenFont((SDL_GetBasePath()+rpath+"FreeSans.ttf").c_str(), 32);
+    TextCharacters Characters = {renderer, font, "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890.~!@#$%^&*()_+-=:;\"'?[]/ "};
+    float FontHeight = TTF_GetFontHeight(font);
+
+
     /* Setup score stuffs */
-    SDL_Surface * tempsurf = TTF_RenderText_Blended(font, "Score: ", 7, {255, 255, 255, 255});
-    SDL_Texture * ScoreLabel = SDL_CreateTextureFromSurface(renderer, tempsurf);
-    SDL_GetTextureSize(ScoreLabel, &FullScore.w, &FullScore.h);
-    for (int i = 0; i < trusizeof(ScoreNum); i++){
-        SDL_DestroySurface(tempsurf);
-        tempsurf = TTF_RenderText_Blended(font, std::to_string(i).c_str(), 1, {255, 255, 255, 255});
-        ScoreNum[i] = SDL_CreateTextureFromSurface(renderer, tempsurf);
-        SDL_GetTextureSize(ScoreNum[i], &ScoreNumRect[i].w, &ScoreNumRect[i].h);
-    }
-
-
-    /* Setup countdown stuffs */
-    SDL_DestroySurface(tempsurf);
-    tempsurf = TTF_RenderText_Blended(font, " Seconds Remaining", 18, {255, 255, 255, 255});
-    SDL_Texture * CountdownLabel = SDL_CreateTextureFromSurface(renderer, tempsurf);
-    SDL_GetTextureSize(CountdownLabel, &FullCountdown.w, &FullCountdown.h);
-    FullCountdown.x = ScreenSpace.x - FullCountdown.w - 8;
+    TextObject ScoreText = {"Score: 0", Left, Top, Vector2(8, 0), {255, 255, 255, 255}, false, true};
+    TextObject CountdownText = {std::to_string(TimeLeft) + " Seconds Left", Right, Top, Vector2(ScreenSpace.x-8, 0), {255, 255, 255, 255}, false};
+    TextObject Name = {"Name: ", Center, Top, Vector2(ScreenSpace.x/2, ScreenSpace.y/2), {255, 255, 255, 0}, false, true, 6, 0};
+    TextObject BoardRender[5] = {{"] ", Left, Top, Vector2(8, 0), {255, 255, 255, 0}, false},
+        {"] ", Left, Top, Vector2(8, FontHeight), {255, 255, 255, 0}, false},
+        {"] ", Left, Top, Vector2(8, FontHeight*2), {255, 255, 255, 0}, false},
+        {"] ", Left, Top, Vector2(8, FontHeight*3), {255, 255, 255, 0}, false},
+        {"] ", Left, Top, Vector2(8, FontHeight*4), {255, 255, 255, 0}, false}
+        };
 
 
     /* Setup circle */
@@ -95,9 +157,9 @@ int main(int argc, char* argv[]){
     SDL_RenderClear(renderer);
     SDL_SetRenderDrawColor(renderer, SDL_Color{255, 255, 255, 255});
     for (int i = 0; i < (pow(radius * 2, 2)); i++){
-        Vector2f center = {(float)radius, (float)radius};
-        Vector2f tempos = {(float)(i % (radius * 2)), (float)(i / (radius * 2))};
-        SDL_SetRenderDrawColorFloat(renderer, 1, 1, 1, limit((float)radius-(tempos-center).magnitude(), 0, 1));
+        Vector2 center = {radius, radius};
+        Vector2 tempos = {(float)(i % ((int)radius * 2)), (float)(int)(i / (radius * 2))};
+        SDL_SetRenderDrawColorFloat(renderer, 1, 1, 1, limit(radius-(tempos-center).Magnitude(), 0, 1));
         SDL_RenderPoint(renderer, tempos.x, tempos.y);
     }
 
@@ -107,20 +169,27 @@ int main(int argc, char* argv[]){
     while (loop){
         deltime = (SDL_GetTicks() - lastime) / 1000.;
         lastime = SDL_GetTicks();
-        TimeLeft -= (Score > 0 && TimeLeft-deltime > 0)?deltime:0;
+        TimeLeft -= limit((Score > 0 && TimeLeft > 0)?deltime:0, 0, TimeLeft);
 
 
-        SDL_SetRenderDrawColor(renderer, SDL_Color{0, 0, 0, 255});
+        SDL_SetRenderDrawColor(renderer, {0, 0, 0, 255});
         SDL_RenderClear(renderer);
-        SDL_GetMouseState(&mouse.x, &mouse.y);
+        mousebitmask = SDL_GetMouseState(&mouse.x, &mouse.y);
 
 
         while (SDL_PollEvent(&e)){
             switch (e.type){
                 case SDL_EVENT_MOUSE_BUTTON_DOWN:
+                    Name.TrySelect(mouse, false, Characters);
                     if (e.button.button == SDL_BUTTON_LEFT){
-                        if ((mouse-pos).magnitude() <= radius && floor(TimeLeft) > 0) {
-                            target = Vector2f{(float)(SDL_rand(ScreenSpace.x-(radius * 4)) + (radius * 2)), (float)(SDL_rand(ScreenSpace.y-(radius * 4) - FullScore.h) + (radius * 2) + FullScore.h)};
+                        if ((mouse-pos).Magnitude() <= radius && floor(TimeLeft) > 0) {
+                            float newrotation = SDL_randf()*2*M_PI;
+                            Vector2 temptarget = target;
+                            while (true){
+                                target = temptarget + Vector2(std::sin(newrotation)*300, std::cos(newrotation)*300);
+                                if (contained(target, {radius, TTF_GetFontHeight(font)+radius, ScreenSpace.x-(radius*2), ScreenSpace.y-(radius*2)-TTF_GetFontHeight(font)})) break;
+                                newrotation = SDL_randf()*2*M_PI;
+                            }
                             Score++;
                         }
                     }
@@ -129,48 +198,152 @@ int main(int argc, char* argv[]){
 
                 case SDL_EVENT_WINDOW_PIXEL_SIZE_CHANGED:
                     SDL_GetWindowSizeInPixels(window, &ScreenSpace.x, &ScreenSpace.y);
-                    FullCountdown.x = ScreenSpace.x - FullCountdown.w - 8;
+                    CountdownText.Position.x = ScreenSpace.x-8;
                     break;
 
 
                 case SDL_EVENT_QUIT:
                     loop = false;
                     break;
+
+
+                case SDL_EVENT_KEY_DOWN:
+                    if (e.key.key == SDLK_DELETE || e.key.key == SDLK_BACKSPACE){
+                        Name.Delete(e.key.key == SDLK_DELETE);
+                    }
+                    if (e.key.key == SDLK_LEFT){
+                        Name.MoveCursor(keystates[SDL_SCANCODE_LSHIFT] || keystates[SDL_SCANCODE_RSHIFT], keystates[SDL_SCANCODE_LCTRL] || keystates[SDL_SCANCODE_RCTRL], true);
+                    }
+                    elif (e.key.key == SDLK_RIGHT){
+                        Name.MoveCursor(keystates[SDL_SCANCODE_LSHIFT] || keystates[SDL_SCANCODE_RSHIFT], keystates[SDL_SCANCODE_LCTRL] || keystates[SDL_SCANCODE_RCTRL], false);
+                    }
+                    if (keystates[SDL_MODKEY]){
+                        if (e.key.key == SDLK_A){
+                            Name.Edit("a", true);
+                        }
+                        elif (e.key.key == SDLK_X){
+                            Name.Edit("x", true);
+                        }
+                        elif (e.key.key == SDLK_C){
+                            Name.Edit("c", true);
+                        }
+                        elif (e.key.key == SDLK_V){
+                            Name.Edit("v", true);
+                        }
+                    }
+                    if (e.key.key == SDLK_RETURN){
+                        if (Name.Selected){
+                            Name.Editable = false;
+                        }
+                    }
+                    break;
+
+
+                case SDL_EVENT_TEXT_INPUT:
+                    Name.Edit(e.text.text, false);
+                    break;
             }
         }
 
 
+        if (mousebitmask & SDL_BUTTON_LMASK){
+            Name.ConTrySelect(mouse, Characters);
+        }
+
+
         pos = target + ((pos-target) * pow(.5, 12. * deltime));
-        rectpos = {pos.x - radius, pos.y - radius, (float)radius * 2, (float)radius * 2};
+        rectpos = {pos.x - radius, pos.y - radius, radius * 2, radius * 2};
 
 
-        /* Render score */
-        float AAAAA = FullScore.w + FullScore.x;
-        for (int i = 0; i < std::to_string(Score).length(); i++){
-            int NumberIndex = ((std::to_string(Score))[i])-'0';
-            ScoreNumRect[NumberIndex].x = AAAAA;
-            SDL_RenderTexture(renderer, ScoreNum[NumberIndex], NULL, &ScoreNumRect[NumberIndex]);
-            AAAAA += ScoreNumRect[NumberIndex].w;
+        if (TimeLeft < 1) {
+            if (!endgame){
+                endgame = true;
+                Name.Editable = true;
+                ScoreText.ChangeHorizontalAlignment(Center, Characters);
+                ScoreText.ChangeVerticalAlignment(Bottom, Characters);
+                CountdownText.Text = "0 Seconds Left";
+            }
+        }
+        else {
+            ScoreText.Text = "Score: " + std::to_string(Score);
+            CountdownText.Text = std::to_string((int)TimeLeft) + " Seconds Left";
         }
 
 
-        /* Render countdown */
-        AAAAA = FullCountdown.x;
-        for (int i = std::to_string((int)floor(TimeLeft)).length()-1; i > -1; i--){
-            int NumberIndex = ((std::to_string((int)floor(TimeLeft)))[i])-'0';
-            ScoreNumRect[NumberIndex].x = AAAAA - ScoreNumRect[NumberIndex].w;
-            SDL_RenderTexture(renderer, ScoreNum[NumberIndex], NULL, &ScoreNumRect[NumberIndex]);
-            AAAAA -= ScoreNumRect[NumberIndex].w;
+        if (endgame){
+            fade += deltime;
+            Name.Mod = {Name.Mod.r, Name.Mod.g, Name.Mod.b, (Uint8)limit(fade*255, 0, 255)};
+            CountdownText.Mod = {CountdownText.Mod.r, CountdownText.Mod.g, CountdownText.Mod.b,  (Uint8)(255-limit(fade*255, 0, 255))};
+            SDL_SetTextureAlphaMod(tutel, 255-(Uint8)limit(fade*255, 0, 255));
+            ScoreText.Position.x = (ScreenSpace.x/2) + ((ScoreText.Position.x - (ScreenSpace.x/2)) * pow(.5, 12. * deltime));
+            ScoreText.Position.y = (ScreenSpace.y/2) + ((ScoreText.Position.y - (ScreenSpace.y/2)) * pow(.5, 12. * deltime));
+            Name.Position.x = (ScreenSpace.x/2);
+            Name.Position.y = (ScreenSpace.y/2);
+            if (!Name.Editable){
+                if (rendscorbord){
+                    scorefade += deltime;
+                    ScoreText.Mod = {ScoreText.Mod.r, ScoreText.Mod.g, ScoreText.Mod.b,  (Uint8)(255-limit(scorefade*255, 0, 255))};
+                    Name.Mod = {Name.Mod.r, Name.Mod.g, Name.Mod.b,  (Uint8)(255-limit(scorefade*255, 0, 255))};
+                    for (int i = 0; i < 5; i++){
+                        BoardRender[i].Render(renderer, Characters);
+                        BoardRender[i].Mod = {BoardRender[i].Mod.r, BoardRender[i].Mod.g, BoardRender[i].Mod.b, (Uint8)limit(scorefade*255, 0, 255)};
+                    }
+                }
+                else{
+                    rendscorbord = true;
+                    int index = -1;
+                    for (int i = 0; i < realsize; i++){
+                        if (Names[i] == slice(Name.Text, 6, Name.Text.length())){
+                            index = i;
+                        }
+                    }
+                    if (index == -1){
+                        TopScores[realsize] = Score;
+                        Names[realsize] = slice(Name.Text, 6, Name.Text.length());
+                        realsize++;
+                    }
+                    else{
+                        if (TopScores[index] < Score){
+                            Names[index] = slice(Name.Text, 6, Name.Text.length());
+                            TopScores[index] = Score;
+                        }
+                    }
+                    bubbleSort(TopScores, Names, realsize);
+                    for (int i = 0; i < 5; i++){
+                        if (i < realsize){
+                            BoardRender[i].Text += Names[i] + ": " + std::to_string(TopScores[i]);
+                        }
+                    }
+
+                    std::string returnv = "{";
+                    for (int i = 0; i < limit(realsize, 0, 5); i++){
+                        returnv += Names[i] + "|" + std::to_string(TopScores[i]);
+                        if (i < limit(realsize, 0, 5)-1){
+                            returnv += ",";
+                        }
+                    }
+                    returnv += "}";
+                    std::ofstream ScoreFile(SDL_GetBasePath()+rpath+"Scores");
+                    ScoreFile << returnv << std::endl;
+                    ScoreFile.close();
+                }
+            }
         }
 
 
-        SDL_SetTextureAlphaMod(tutel, limit(TimeLeft*255, 0, 255));
-        SDL_RenderTexture(renderer, ScoreLabel, NULL, &FullScore);
-        SDL_RenderTexture(renderer, CountdownLabel, NULL, &FullCountdown);
-        SDL_RenderTexture(renderer, tutel, NULL, &rectpos);
+        /* Render score and countdown */
+        ScoreText.Render(renderer, Characters);
+        CountdownText.Render(renderer, Characters);
+        Name.Render(renderer, Characters);
+
+
+        SDL_RenderTexture(renderer, tutel, nullptr, &rectpos);
         SDL_RenderPresent(renderer);
     }
 
+
+    SDL_StopTextInput(window);
+    SDL_DestroyTexture(tutel);
     TTF_CloseFont(font);
     TTF_Quit();
     SDL_Quit();

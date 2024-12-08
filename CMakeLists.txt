@@ -1,5 +1,5 @@
 # Basic project requirements
-cmake_minimum_required(VERSION 3.31)
+cmake_minimum_required(VERSION 3.30)
 if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     set(CMAKE_OSX_SYSROOT macosx)
 endif()

@@ -272,8 +272,8 @@ int main(int argc, char* argv[]){
 
         if (endgame){
             fade += deltime;
-            Name.Mod = {Name.Mod.r, Name.Mod.g, Name.Mod.b, (Uint8)limit(fade*255, 0, 255)};
-            CountdownText.Mod = {CountdownText.Mod.r, CountdownText.Mod.g, CountdownText.Mod.b,  (Uint8)(255-limit(fade*255, 0, 255))};
+            Name.Mod.a = (Uint8)limit(fade*255, 0, 255);
+            CountdownText.Mod.a = (Uint8)(255-limit(fade*255, 0, 255));
             SDL_SetTextureAlphaMod(tutel, 255-(Uint8)limit(fade*255, 0, 255));
             ScoreText.Position.x = (ScreenSpace.x/2) + ((ScoreText.Position.x - (ScreenSpace.x/2)) * pow(.5, 12. * deltime));
             ScoreText.Position.y = (ScreenSpace.y/2) + ((ScoreText.Position.y - (ScreenSpace.y/2)) * pow(.5, 12. * deltime));
@@ -282,11 +282,11 @@ int main(int argc, char* argv[]){
             if (!Name.Editable){
                 if (rendscorbord){
                     scorefade += deltime;
-                    ScoreText.Mod = {ScoreText.Mod.r, ScoreText.Mod.g, ScoreText.Mod.b,  (Uint8)(255-limit(scorefade*255, 0, 255))};
-                    Name.Mod = {Name.Mod.r, Name.Mod.g, Name.Mod.b,  (Uint8)(255-limit(scorefade*255, 0, 255))};
+                    ScoreText.Mod.a = (Uint8)(255-limit(scorefade*255, 0, 255));
+                    Name.Mod.a = (Uint8)(255-limit(scorefade*255, 0, 255));
                     for (int i = 0; i < 5; i++){
                         BoardRender[i].Render(renderer, Characters);
-                        BoardRender[i].Mod = {BoardRender[i].Mod.r, BoardRender[i].Mod.g, BoardRender[i].Mod.b, (Uint8)limit(scorefade*255, 0, 255)};
+                        BoardRender[i].Mod.a = (Uint8)limit(scorefade*255, 0, 255);
                     }
                 }
                 else{
